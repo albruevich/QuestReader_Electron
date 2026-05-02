@@ -18,8 +18,8 @@ function loadQuest() {
 }
 
 function startQuest() {
-
     initParameters();
+    initControversials();
 
     const startLocation = quest.locations.find(l => l.locationType === "Start");
 
@@ -60,12 +60,11 @@ function showCurrentLocation() {
     }
 
     if (currentLocation.locationType === "Fail") {
-        addSystemButton("You win", returnToMenu);
+        addSystemButton("You lose", returnToMenu);
         return;
     }
 
-    const passages = quest.passages
-        .filter(p => p.from === currentLocation.id)
+    const passages = buildWorkPassages(currentLocation)
         .filter(p => isPassageAvailable(p))
         .sort((a, b) => a.displayOrder - b.displayOrder);
 
@@ -320,6 +319,99 @@ function returnToMenu() {
     };
 
     choicesEl.appendChild(button);
+}
+
+function initControversials() {
+    for (const passage of quest.passages) {
+        passage.controversials = [];
+
+        for (const other of quest.passages) {
+            if (
+                other.from === passage.from &&
+                other.id !== passage.id &&
+                other.question === passage.question
+            ) {
+                passage.controversials.push(other);
+            }
+        }
+    }
+}
+
+function buildWorkPassages(location) {
+    const passages = quest.passages.filter(p => p.from === location.id);
+    const workPassages = [];
+
+    const probabilityPassages = [];
+
+    for (const passage of passages) {
+        if (passage.priority < 1) {
+            if (Math.random() * 100 <= passage.priority * 100) {
+                workPassages.push(passage);
+            }
+
+            probabilityPassages.push(passage);
+        }
+    }
+
+    const normalPassages = passages.filter(p => !probabilityPassages.includes(p));
+
+    const excludedIds = new Set();
+
+    for (let n = normalPassages.length - 1; n >= 0; n--) {
+        const passage = normalPassages[n];
+
+        if (excludedIds.has(passage.id)) {
+            continue;
+        }
+
+        if (workPassages.includes(passage)) {
+            continue;
+        }
+
+        if ((!passage.controversials || passage.controversials.length === 0) && passage.priority >= 1) {
+            workPassages.push(passage);
+            continue;
+        }
+
+        const allControversials = [...passage.controversials, passage];
+        const selected = selectControversialByPriority(allControversials);
+
+        workPassages.push(selected);
+
+        for (const controversialPassage of allControversials) {
+            excludedIds.add(controversialPassage.id);
+        }
+    }
+
+    return workPassages;
+}
+
+function selectControversialByPriority(passages) {
+    let total = 0;
+
+    for (const passage of passages) {
+        total += Math.floor(passage.priority);
+    }
+
+    if (total <= 0) {
+        return passages[0];
+    }
+
+    const randomValue = Math.floor(Math.random() * total);
+
+    let current = 0;
+
+    for (const passage of passages) {
+        const weight = Math.floor(passage.priority);
+
+        if (randomValue >= current && randomValue < current + weight) {
+            return passage;
+        }
+
+        current += weight;
+    }
+
+    return passages[0];
 }
 
 document.getElementById("startBtn").addEventListener("click", () => {
