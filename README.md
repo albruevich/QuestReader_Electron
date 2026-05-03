@@ -40,15 +40,12 @@ The project can be used:
 
 ## Features
 
-- Branching quest progression
-- Parameters / stats system
-- Conditional transitions
-- Images with fade transitions
-- Sound effects and background music
-- Keyboard navigation
-- Animated text output
-- Multi-language quests
-- JSON-based content pipeline
+- Branching quest structure with multiple outcomes
+- State parameters affecting progression and choices
+- Conditional transitions based on quest logic
+- Support for images, sound effects, and background music
+- Keyboard and mouse navigation
+- JSON-based quest content system
 
 ---
 
