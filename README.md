@@ -23,8 +23,6 @@ Together with the [Text Quest Editor](https://github.com/albruevich/Text-Quest-E
 
 <img src="docs/screen_1.webp" width="700">
 
-<img src="docs/screen_2.webp" width="700">
-
 ---
 
 ## About the Project
