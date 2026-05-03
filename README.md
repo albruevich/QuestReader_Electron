@@ -104,17 +104,15 @@ After launch:
 
 ---
 
-## Why This Project Matters
+## Technical Highlights
 
-This repository demonstrates practical skills beyond a single engine:
-
-- Porting logic from C# to TypeScript
-- Desktop application development
-- Working with local file systems
-- Data-driven architecture
-- UI/UX adaptation across platforms
-- Multimedia integration
-- Cross-stack engineering mindset
+- Desktop application development with Electron
+- TypeScript-based project structure
+- JSON-driven content architecture
+- Local file system resource loading
+- Multimedia integration (images, audio, music)
+- Keyboard-focused desktop UX
+- Modular quest/gameplay logic
 
 ---
 
