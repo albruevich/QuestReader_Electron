@@ -1,4 +1,4 @@
-[English](README.md)
+[English](README.md) | [Українська](README.ua.md)
 
 # Quest Reader Electron
 
