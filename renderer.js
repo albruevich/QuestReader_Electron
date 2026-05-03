@@ -14,6 +14,43 @@ const paramsEl = document.getElementById("params");
 
 const QUESTS_FOLDER = path.join(__dirname, "_Quests");
 
+function getLang() {
+    if (!quest || !quest.lang) {
+        return "en";
+    }
+
+    return quest.lang.toLowerCase();
+}
+
+function t(key) {
+    const lang = getLang();
+
+    const dict = {
+        next: {
+            ru: "Далее",
+            uk: "Далі",
+            en: "Next"
+        },
+        win: {
+            ru: "Вы победили",
+            uk: "Ви перемогли",
+            en: "You win"
+        },
+        lose: {
+            ru: "Вы проиграли",
+            uk: "Ви програли",
+            en: "You lose"
+        },
+        startQuest: {
+            ru: "Начать выбранный квест",
+            uk: "Почати вибраний квест",
+            en: "Start Selected Quest"
+        }
+    };
+
+    return dict[key]?.[lang] || dict[key]?.en || key;
+}
+
 function ensureQuestsFolderExists() {
     if (!fs.existsSync(QUESTS_FOLDER)) {
         fs.mkdirSync(QUESTS_FOLDER, { recursive: true });
@@ -38,17 +75,24 @@ function findQuestFolders() {
             continue;
         }
 
+        let questJson = null;
         let displayName = entry.name;
+        let description = "";
         let order = 0;
 
         try {
             const json = fs.readFileSync(questJsonPath, "utf8");
-            const questJson = JSON.parse(json);
+            questJson = JSON.parse(json);
 
             displayName =
                 questJson.displayName ||
                 questJson.questName ||
                 entry.name;
+
+            description =
+                questJson.description ||
+                questJson.descrition ||
+                "";
 
             order = Number(questJson.order || 0);
         }
@@ -59,6 +103,7 @@ function findQuestFolders() {
         result.push({
             folderName: entry.name,
             displayName,
+            description,
             order,
             folderPath: questFolderPath,
             questJsonPath
@@ -66,8 +111,8 @@ function findQuestFolders() {
     }
 
     result.sort((a, b) => {
-        if (b.order !== a.order) {
-            return b.order - a.order;
+        if (a.order !== b.order) {
+            return a.order - b.order;
         }
 
         return a.displayName.localeCompare(b.displayName);
@@ -83,10 +128,27 @@ function loadQuest(questInfo) {
     selectedQuestInfo = questInfo;
 }
 
+function selectQuest(questInfo) {
+    loadQuest(questInfo);
+
+    textEl.innerHTML = buildQuestDescriptionHtml(questInfo);
+    renderMenuButtons();
+    renderQuestList();
+}
+
+function buildQuestDescriptionHtml(questInfo) {
+    const title = questInfo.displayName || questInfo.folderName;
+    const description = questInfo.description || "No description.";
+
+    return `<b>${title}</b><br><br>${description.replaceAll("\n", "<br>")}`;
+}
+
 function startQuest() {
     if (!quest) {
         return;
     }
+
+    document.body.classList.remove("menu-mode");
 
     gameController = new GameController();
 
@@ -106,7 +168,10 @@ function choosePassage(passageId) {
 }
 
 function renderState(state) {
-    titleEl.textContent = state.title;
+    if (titleEl) {
+        titleEl.textContent = state.title;
+    }
+
     textEl.innerHTML = state.mainText;
 
     renderParams(state.params);
@@ -130,12 +195,12 @@ function renderChoices(state) {
     choicesEl.innerHTML = "";
 
     if (state.result === "victory") {
-        addSystemButton("You win", returnToMenu);
+        addSystemButton(t("win"), returnToMenu);
         return;
     }
 
     if (state.result === "fail") {
-        addSystemButton("You lose", returnToMenu);
+        addSystemButton(t("lose"), returnToMenu);
         return;
     }
 
@@ -147,7 +212,13 @@ function renderChoices(state) {
 function addChoiceButton(choice) {
     const button = document.createElement("button");
 
-    button.textContent = choice.question;
+    let caption = choice.question;
+
+    if (caption === "__NEXT__") {
+        caption = t("next");
+    }
+
+    button.textContent = caption;
     button.disabled = choice.interactable === false;
 
     button.onclick = () => {
@@ -176,22 +247,18 @@ function addQuestButton(questInfo) {
     button.textContent = questInfo.displayName;
     button.title = questInfo.folderPath;
 
+    if (selectedQuestInfo && selectedQuestInfo.questJsonPath === questInfo.questJsonPath) {
+        button.classList.add("selected");
+    }
+
     button.onclick = () => {
-        loadQuest(questInfo);
-        startQuest();
+        selectQuest(questInfo);
     };
 
     choicesEl.appendChild(button);
 }
 
-function returnToMenu() {
-    quest = null;
-    selectedQuestInfo = null;
-    gameController = null;
-
-    titleEl.textContent = "Quest Reader";
-    textEl.innerHTML = "Select quest folder";
-    paramsEl.innerHTML = "";
+function renderQuestList() {
     choicesEl.innerHTML = "";
 
     const quests = findQuestFolders();
@@ -203,13 +270,65 @@ function returnToMenu() {
         info.textContent =
             "No quests found. Expected structure: _Quests/QuestFolder/quest.json";
 
-        paramsEl.appendChild(info);
+        choicesEl.appendChild(info);
         return;
     }
 
     for (const questInfo of quests) {
         addQuestButton(questInfo);
     }
+}
+
+function renderMenuButtons() {
+    paramsEl.innerHTML = "";
+
+    const startButton = document.createElement("button");
+
+    startButton.textContent = t("startQuest");
+    startButton.className = "start-button";
+    startButton.disabled = !selectedQuestInfo;
+    startButton.onclick = startQuest;
+
+    paramsEl.appendChild(startButton);
+}
+
+function returnToMenu() {
+    quest = null;
+    gameController = null;
+
+    document.body.classList.add("menu-mode");
+
+    if (titleEl) {
+        titleEl.textContent = "Quest Reader";
+    }
+
+    paramsEl.innerHTML = "";
+    choicesEl.innerHTML = "";
+
+    const quests = findQuestFolders();
+
+    if (quests.length === 0) {
+        selectedQuestInfo = null;
+        textEl.innerHTML = "No quests found.";
+
+        const info = document.createElement("div");
+        info.className = "param";
+        info.textContent =
+            "Expected structure: _Quests/QuestFolder/quest.json";
+
+        choicesEl.appendChild(info);
+        renderMenuButtons();
+        return;
+    }
+
+    // auto select first quest
+    selectedQuestInfo = quests[0];
+    loadQuest(selectedQuestInfo);
+
+    textEl.innerHTML = buildQuestDescriptionHtml(selectedQuestInfo);
+
+    renderQuestList();
+    renderMenuButtons();
 }
 
 returnToMenu();
