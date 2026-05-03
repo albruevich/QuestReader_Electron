@@ -14,6 +14,8 @@ let gameController = null;
 let keyboardIndex = 0;
 let currentKeyboardButtons = [];
 
+let aliveTextTimer = null;
+
 const titleEl = document.getElementById("title");
 const textEl = document.getElementById("mainText");
 const choicesEl = document.getElementById("choices");
@@ -149,7 +151,7 @@ function loadQuest(questInfo) {
 function selectQuest(questInfo, keepKeyboardIndex = false) {
     loadQuest(questInfo);
 
-    textEl.innerHTML = buildQuestDescriptionHtml(questInfo);
+    setAliveText(buildQuestDescriptionHtml(questInfo));
 
     renderQuestImage(questInfo.startImage);
     renderMenuButtons();
@@ -193,12 +195,107 @@ function renderState(state) {
         titleEl.textContent = state.title;
     }
 
-    textEl.innerHTML = state.mainText;
+    setAliveText(state.mainText);
 
     renderQuestImage(state.imageName);
     renderParams(state.params);
     renderChoices(state);
     renderQuestAudio(state);
+}
+
+function setAliveText(value, instant = false) {
+    if (aliveTextTimer) {
+        clearInterval(aliveTextTimer);
+        aliveTextTimer = null;
+    }
+
+    if (!value) {
+        textEl.innerHTML = "";
+        return;
+    }
+
+    if (instant) {
+        textEl.innerHTML = value;
+        return;
+    }
+
+    const plainTextLength = value
+        .replace(/<br\s*\/?>/g, "\n")
+        .replace(/<[^>]*>/g, "")
+        .length;
+
+    if (plainTextLength <= 0) {
+        textEl.innerHTML = value;
+        return;
+    }
+
+    const charsPerSecond = getCharsPerSecond(plainTextLength);
+    const intervalMs = 16;
+
+    let visibleChars = 0;
+
+    textEl.innerHTML = "";
+
+    aliveTextTimer = setInterval(() => {
+        visibleChars += charsPerSecond * (intervalMs / 1000);
+
+        textEl.innerHTML = sliceHtmlByVisibleChars(
+            value,
+            Math.floor(visibleChars)
+        );
+
+        if (visibleChars >= plainTextLength) {
+            clearInterval(aliveTextTimer);
+            aliveTextTimer = null;
+            textEl.innerHTML = value;
+        }
+    }, intervalMs);
+}
+
+function getCharsPerSecond(textLength) {
+    const minCharsPerSecond = 80;
+    const maxCharsPerSecond = 700;
+    const shortTextLength = 40;
+    const longTextLength = 500;
+
+    let t =
+        (textLength - shortTextLength) /
+        (longTextLength - shortTextLength);
+
+    t = Math.max(0, Math.min(1, t));
+
+    return minCharsPerSecond +
+        (maxCharsPerSecond - minCharsPerSecond) * t;
+}
+
+function sliceHtmlByVisibleChars(html, maxChars) {
+    let result = "";
+    let visible = 0;
+    let insideTag = false;
+
+    for (let i = 0; i < html.length; i++) {
+        const ch = html[i];
+
+        if (ch === "<") {
+            insideTag = true;
+        }
+
+        result += ch;
+
+        if (!insideTag) {
+            visible++;
+
+            if (visible >= maxChars) {
+                break;
+            }
+        }
+
+        if (ch === ">") {
+            insideTag = false;
+        }
+    }
+
+    return result;
 }
 
 function renderQuestAudio(state) {
@@ -328,7 +425,7 @@ function addChoiceButton(choice) {
         caption = t("next");
     }
 
-    button.textContent = caption;
+    setAliveButtonText(button, caption);
     button.disabled = choice.interactable === false;
 
     button.onmouseenter = () => {
@@ -458,7 +555,7 @@ function returnToMenu() {
 
     if (quests.length === 0) {
         selectedQuestInfo = null;
-        textEl.innerHTML = "No quests found.";
+        setAliveText("No quests found.", true);
         renderQuestImage(null);
 
         const info = document.createElement("div");
@@ -475,7 +572,7 @@ function returnToMenu() {
     selectedQuestInfo = quests[0];
     loadQuest(selectedQuestInfo);
 
-    textEl.innerHTML = buildQuestDescriptionHtml(selectedQuestInfo);
+    setAliveText(buildQuestDescriptionHtml(selectedQuestInfo));
 
     renderQuestImage(selectedQuestInfo.startImage);
     renderQuestList();
@@ -588,6 +685,30 @@ function leaveQuest() {
     if (gameController) {
         returnToMenu();
     }
+}
+
+function setAliveButtonText(button, value) {
+    if (!value) {
+        button.textContent = "";
+        return;
+    }
+
+    const charsPerSecond = getCharsPerSecond(value.length);
+    const intervalMs = 16;
+
+    let visibleChars = 0;
+    button.textContent = "";
+
+    const timer = setInterval(() => {
+        visibleChars += charsPerSecond * (intervalMs / 1000);
+
+        button.textContent = value.substring(0, Math.floor(visibleChars));
+
+        if (visibleChars >= value.length) {
+            clearInterval(timer);
+            button.textContent = value;
+        }
+    }, intervalMs);
 }
 
 document.addEventListener("keydown", (event) => {
