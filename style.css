@@ -20,16 +20,29 @@ body {
     height: 100vh;
     padding: 22px;
 
-    display: grid;
-    grid-template-columns: 1fr calc((100vh - 66px) / 2);
-    grid-template-rows: calc((100vh - 66px) / 2) calc((100vh - 66px) / 2);
+    display: flex;
     gap: 22px;
+}
+
+#leftColumn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+#rightColumn {
+    width: min(540px, 42vw);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-height: 0;
 }
 
 .panel {
     box-sizing: border-box;
     position: relative;
-    overflow: hidden;
+    overflow: auto;
 
     background:
         linear-gradient(rgba(28, 54, 55, 0.82), rgba(18, 35, 34, 0.82)),
@@ -44,17 +57,32 @@ body {
 }
 
 .main-text-panel {
+    flex: 0 0 58%;
     padding: 34px 36px;
+
     font-size: 18px;
     line-height: 1.35;
     font-weight: 400;
+
+    white-space: pre-wrap;
+}
+
+.choices-panel {
+    flex: 1;
+    padding: 24px 34px;
 }
 
 .picture-panel {
     width: 100%;
-    height: 100%;
     aspect-ratio: 1 / 1;
-    background: #101610;
+    height: auto;
+    flex: 0 0 auto;
+}
+
+.params-panel {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
 }
 
 #mainImage {
@@ -68,11 +96,10 @@ body {
     display: block;
 }
 
-.choices-panel {
-    padding: 24px 34px;
-}
-
 .params-panel {
+    flex: 1;
+    min-height: 140px;
+
     padding: 24px 20px;
     font-size: 17px;
     line-height: 1.45;
@@ -125,13 +152,15 @@ button:disabled:hover {
     background: transparent;
 }
 
+button.selected {
+    background: rgba(0, 0, 0, 0.35);
+}
+
 .param {
     margin: 0 0 5px 0;
     color: #c9c49a;
     font-weight: 600;
 }
-
-/* menu mode */
 
 body.menu-mode .main-text-panel {
     font-size: 18px;
@@ -141,10 +170,6 @@ body.menu-mode .params-panel {
     display: flex;
     align-items: center;
     justify-content: center;
-}
-
-button.selected {
-    background: rgba(0, 0, 0, 0.35);
 }
 
 .start-button {
@@ -160,7 +185,19 @@ button.selected {
     margin: 0;
 }
 
-#mainText {
-    white-space: pre-wrap;
-    font-family: Arial, sans-serif;
+.panel::-webkit-scrollbar {
+    width: 10px;
+}
+
+.panel::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.panel::-webkit-scrollbar-thumb {
+    background: rgba(201, 196, 154, 0.45);
+    border-radius: 8px;
+}
+
+.panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(201, 196, 154, 0.65);
 }
