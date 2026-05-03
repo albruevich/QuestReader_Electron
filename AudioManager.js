@@ -5,7 +5,7 @@ const { pathToFileURL } = require("url");
 class AudioManager {
     constructor() {
         this.musicFadeDuration = 0.5;
-        this.defaultMusicVolume = 0.2;
+        this.defaultMusicVolume = 0.1;
         this.defaultSfxVolume = 0.25;
 
         this.currentMusicName = null;
@@ -93,7 +93,7 @@ class AudioManager {
     }
 
     playHover() {
-        this.playGlobalSfx("hover", 0.25);
+        this.playGlobalSfx("hover", 0.6);
     }
 
     playGlobalSfx(sfxName, volume = 1.0) {

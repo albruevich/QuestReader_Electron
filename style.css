@@ -225,3 +225,20 @@ body.play-mode.keyboard-mode #choices button.selected,
 body.play-mode.keyboard-mode #choices button.selected:hover {
     background: rgba(0, 0, 0, 0.35) !important;
 }
+
+#choices button {
+    position: relative;
+}
+
+.quest-name {
+    display: inline-block;
+}
+
+.quest-lang {
+    position: absolute;
+    left: 60%;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.75;
+    white-space: nowrap;
+}

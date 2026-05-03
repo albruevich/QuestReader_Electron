@@ -18,7 +18,13 @@ export class PassageResolver {
 
     resolveVisiblePassages(location: Location): PassageInfo[] {
         const workPassages = this.buildWorkPassages(location);
-        workPassages.sort((a, b) => a.displayOrder - b.displayOrder);
+
+        workPassages.sort((a, b) => {
+            if (a.displayOrder < b.displayOrder) return -1;
+            if (a.displayOrder > b.displayOrder) return 1;
+
+            return Math.floor(Math.random() * 3) - 1;
+        });
 
         const visiblePassages: PassageInfo[] = [];
 
@@ -174,5 +180,15 @@ export class PassageResolver {
         }
 
         return passCondition && logicalCondition && inRange && takesOrNotValues && multipleOrNotValues;
+    }
+
+    private shuffle<T>(array: T[]): void {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+
+            const temp = array[i];
+            array[i] = array[j];
+            array[j] = temp;
+        }
     }
 }

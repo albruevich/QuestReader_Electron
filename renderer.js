@@ -95,6 +95,7 @@ function findQuestFolders() {
         let description = "";
         let startImage = "";
         let order = 0;
+        let lang = "en";
 
         try {
             const json = fs.readFileSync(questJsonPath, "utf8");
@@ -112,6 +113,7 @@ function findQuestFolders() {
 
             startImage = questJson.startImage || "";
             order = Number(questJson.order || 0);
+            lang = questJson.lang || "en";
         }
         catch (error) {
             console.warn("Invalid quest.json:", questJsonPath, error);
@@ -123,6 +125,7 @@ function findQuestFolders() {
             description,
             startImage,
             order,
+            lang,
             folderPath: questFolderPath,
             questJsonPath
         });
@@ -477,7 +480,17 @@ function addSystemButton(text, action) {
 function addQuestButton(questInfo, index) {
     const button = document.createElement("button");
 
-    button.textContent = questInfo.displayName;
+    const lang = (questInfo.lang || "en").toLowerCase();
+
+    let langTag = "[EN]";
+    if (lang === "ru") langTag = "[RU]";
+    if (lang === "uk") langTag = "[UK]";
+
+    button.innerHTML = `
+        <span class="quest-name">${questInfo.displayName}</span>
+        <span class="quest-lang">${langTag}</span>
+        `;
+
     button.dataset.questJsonPath = questInfo.questJsonPath;
 
     if (selectedQuestInfo && selectedQuestInfo.questJsonPath === questInfo.questJsonPath) {
