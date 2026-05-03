@@ -19,6 +19,8 @@ export type GameViewState = {
     choices: ChoiceView[];
     result: "none" | "victory" | "fail";
     imageName: string | null;
+    musicName: string | null;
+    soundName: string | null;
 };
 
 export class GameController {
@@ -84,18 +86,26 @@ export class GameController {
         this.applyInfluences(this.currentLocation);
         this.applyParamsActions(this.currentLocation);
 
+        const criticalFailState = this.getCriticalFailState();
+
+        if (criticalFailState) {
+            return criticalFailState;
+        }
+
         const description = this.getLocationDescription(this.currentLocation);
         const imageName = this.extractImageName(description);
+        const musicName = this.extractMusicName(description);
+        const soundName = this.extractSoundName(description);
         const mainText = this.cleanText(description);
 
         if (this.currentLocation.locationType === LocationType.Victory) {
             this.currentLocation.visitCounter++;
-            return this.makeState(mainText, [], "victory", imageName);
+            return this.makeState(mainText, [], "victory", imageName, musicName, soundName);
         }
 
         if (this.currentLocation.locationType === LocationType.Fail) {
             this.currentLocation.visitCounter++;
-            return this.makeState(mainText, [], "fail", imageName);
+            return this.makeState(mainText, [], "fail", imageName, musicName, soundName);
         }
 
         const choices = this.passageResolver
@@ -109,7 +119,7 @@ export class GameController {
 
         this.currentLocation.visitCounter++;
 
-        return this.makeState(mainText, choices, "none", imageName);
+        return this.makeState(mainText, choices, "none", imageName, musicName, soundName);
     }
 
     public getQuest(): Quest | null {
@@ -131,6 +141,12 @@ export class GameController {
 
         this.applyInfluences(passage);
         this.applyParamsActions(passage);
+
+        const criticalFailState = this.getCriticalFailState();
+
+        if (criticalFailState) {
+            return criticalFailState;
+        }
 
         passage.visitCounter++;
 
@@ -154,12 +170,16 @@ export class GameController {
         this.singlePassage = passage;
 
         const imageName = this.extractImageName(passage.description);
+        const musicName = this.extractMusicName(passage.description);
+        const soundName = this.extractSoundName(passage.description);
 
         return this.makeState(
             this.cleanText(passage.description),
             [{ id: -1, question: "__NEXT__", interactable: true }],
             "none",
-            imageName
+            imageName,
+            musicName,
+            soundName
         );
     }
 
@@ -323,9 +343,22 @@ export class GameController {
     }
 
     private extractImageName(text: string): string | null {
+        return this.extractTagName(text, "im");
+    }
+
+    private extractMusicName(text: string): string | null {
+        return this.extractTagName(text, "mu");
+    }
+
+    private extractSoundName(text: string): string | null {
+        return this.extractTagName(text, "so");
+    }
+
+    private extractTagName(text: string, tag: string): string | null {
         if (!text) return null;
 
-        const matches = [...text.matchAll(/<im\s+(.+?)\s+im>/g)];
+        const regex = new RegExp(`<${tag}\\s+(.+?)\\s+${tag}>`, "g");
+        const matches = [...text.matchAll(regex)];
 
         if (matches.length === 0) {
             return null;
@@ -352,7 +385,9 @@ export class GameController {
         mainText: string,
         choices: ChoiceView[],
         result: GameViewState["result"],
-        imageName: string | null
+        imageName: string | null,
+        musicName: string | null,
+        soundName: string | null
     ): GameViewState {
         return {
             title: this.quest ? this.quest.displayName || this.quest.questName : "",
@@ -360,7 +395,9 @@ export class GameController {
             params: this.getVisibleParams(),
             choices,
             result,
-            imageName
+            imageName,
+            musicName,
+            soundName
         };
     }
 
@@ -371,11 +408,61 @@ export class GameController {
             params: [],
             choices: [],
             result: "none",
-            imageName: null
+            imageName: null,
+            musicName: null,
+            soundName: null
         };
     }
 
     private clamp(value: number, min: number, max: number): number {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private getCriticalFailState(): GameViewState | null {
+        if (!this.quest) {
+            return null;
+        }
+
+        for (const parameter of this.quest.parameters) {
+            if (!parameter.isActive) {
+                continue;
+            }
+
+            if (parameter.paramType !== "Failed") {
+                continue;
+            }
+
+            if (!parameter.criticText || parameter.criticText.trim() === "") {
+                continue;
+            }
+
+            const isCriticalMax = parameter.isCriticMax === true;
+
+            const isCritical = isCriticalMax
+                ? parameter.value >= parameter.maxValue
+                : parameter.value <= parameter.minValue;
+
+            if (!isCritical) {
+                continue;
+            }
+
+            const failText = parameter.criticText;
+
+            const imageName = this.extractImageName(failText);
+            const musicName = this.extractMusicName(failText);
+            const soundName = this.extractSoundName(failText);
+            const mainText = this.cleanText(failText);
+
+            return this.makeState(
+                mainText,
+                [],
+                "fail",
+                imageName,
+                musicName,
+                soundName
+            );
+        }
+
+        return null;
     }
 }

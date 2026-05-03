@@ -1,3 +1,6 @@
+const { AudioManager } = require("./AudioManager");
+const audioManager = new AudioManager();
+
 const { GameController } = require("./dist/_Core/GameController");
 
 const fs = require("fs");
@@ -135,6 +138,8 @@ function loadQuest(questInfo) {
 
     quest = JSON.parse(json);
     selectedQuestInfo = questInfo;
+
+    audioManager.setQuestFolder(questInfo.folderPath);
 }
 
 function selectQuest(questInfo, keepKeyboardIndex = false) {
@@ -189,6 +194,17 @@ function renderState(state) {
     renderQuestImage(state.imageName);
     renderParams(state.params);
     renderChoices(state);
+    renderQuestAudio(state);
+}
+
+function renderQuestAudio(state) {
+    if (state.musicName) {
+        audioManager.playMusic(state.musicName, true);
+    }
+
+    if (state.soundName) {
+        audioManager.playSfx(state.soundName);
+    }
 }
 
 function renderQuestImage(imageName) {
@@ -293,9 +309,13 @@ function addChoiceButton(choice) {
     button.disabled = choice.interactable === false;
 
     button.onmouseenter = () => {
+        audioManager.playHover();
+
         if (!gameController || button.disabled) {
             return;
         }
+
+        document.body.classList.remove("keyboard-mode");
 
         const buttons = Array.from(
             choicesEl.querySelectorAll("button:not(:disabled)")
@@ -303,8 +323,6 @@ function addChoiceButton(choice) {
 
         keyboardIndex = buttons.indexOf(button);
         updateKeyboardSelection();
-
-        document.body.classList.remove("keyboard-mode");
     };
 
     button.onclick = () => {
@@ -312,6 +330,7 @@ function addChoiceButton(choice) {
             return;
         }
 
+        audioManager.playClick();
         choosePassage(choice.id);
     };
 
@@ -322,7 +341,15 @@ function addSystemButton(text, action) {
     const button = document.createElement("button");
 
     button.textContent = text;
-    button.onclick = action;
+
+    button.onmouseenter = () => {
+        audioManager.playHover();
+    };
+
+    button.onclick = () => {
+        audioManager.playClick();
+        action();
+    };
 
     choicesEl.appendChild(button);
 }
@@ -338,6 +365,8 @@ function addQuestButton(questInfo, index) {
     }
 
     button.onclick = () => {
+        audioManager.playClick();
+
         keyboardIndex = index;
         selectQuest(questInfo, true);
     };
@@ -498,12 +527,14 @@ function moveKeyboardSelection(direction) {
         const questInfo = quests[keyboardIndex];
 
         if (questInfo) {
+            audioManager.playClick();
             selectQuest(questInfo, true);
         }
 
         return;
     }
 
+    audioManager.playClick();
     updateKeyboardSelection();
 }
 
@@ -549,12 +580,14 @@ document.addEventListener("keydown", (event) => {
 
     if (event.key === "Enter") {
         event.preventDefault();
+        audioManager.playClick();
         submitKeyboardSelection();
         return;
     }
 
     if (event.key === "Escape") {
         event.preventDefault();
+        audioManager.playClick();
         leaveQuest();
         return;
     }
