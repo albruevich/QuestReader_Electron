@@ -97,10 +97,13 @@ Open the folder in:
 
 ```bash
 npm install
+```
 
 ### 4. Start the application
 
+```bash
 npm start
+```
 
 This command will compile the TypeScript code and launch the Electron app.
 
