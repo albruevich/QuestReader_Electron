@@ -9,6 +9,7 @@ import { TextParser } from "./TextParser";
 export type ChoiceView = {
     id: number;
     question: string;
+    interactable: boolean;
 };
 
 export type GameViewState = {
@@ -98,10 +99,10 @@ export class GameController {
 
         const choices = this.passageResolver
             ? this.passageResolver.resolveVisiblePassages(this.currentLocation)
-                .map(info => info.pass)
-                .map(p => ({
-                    id: p.id,
-                    question: this.parseText(p.question)
+                .map(info => ({
+                    id: info.pass.id,
+                    question: this.parseText(info.pass.question),
+                    interactable: info.isAllConditions
                 }))
             : [];
 
@@ -153,7 +154,7 @@ export class GameController {
 
         return this.makeState(
             this.cleanText(passage.description),
-            [{ id: -1, question: "Next" }],
+            [{ id: -1, question: "Next", interactable: true }],
             "none"
         );
     }

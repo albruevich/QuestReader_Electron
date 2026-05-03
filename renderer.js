@@ -70,6 +70,7 @@ function renderChoices(state) {
 function addChoiceButton(choice) {
     const button = document.createElement("button");
     button.textContent = choice.question;
+    button.disabled = choice.interactable === false;
     button.onclick = () => choosePassage(choice.id);
 
     choicesEl.appendChild(button);
