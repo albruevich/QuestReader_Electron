@@ -1,16 +1,20 @@
 import { Quest } from "../_Data/Quest";
 import { Location } from "../_Data/Location";
 import { Passage } from "../_Data/Passage";
-import { PassageInfo } from "./PassageInfo";
-import { QuestService } from "./QuestService";
-import { TextParser } from "./TextParser";
+
+export type PassageInfo = {
+    pass: Passage;
+    isAllConditions: boolean;
+};
 
 export class PassageResolver {
-
     constructor(
         private quest: Quest,
-        private textParser: TextParser
-    ) {}
+        private gameController: {
+            evaluateBoolFormulaPublic(formula: string): boolean;
+            evaluateNumberFormulaPublic(formula: string): number;
+        }
+    ) { }
 
     resolveVisiblePassages(location: Location): PassageInfo[] {
         const workPassages = this.buildWorkPassages(location);
@@ -33,19 +37,72 @@ export class PassageResolver {
     }
 
     private buildWorkPassages(location: Location): Passage[] {
-        const passages = QuestService
-            .findAllPassagesFromLocation(this.quest, location.id)
-            .slice();
-
+        const passages = this.quest.passages.filter(p => p.from === location.id);
         const workPassages: Passage[] = [];
+        const toDeleteByProbability: Passage[] = [];
 
         for (const passage of passages) {
             if (passage.priority < 1) {
-                if (Math.random() * 100 <= passage.priority * 100) {
+                if (Math.floor(Math.random() * 100) <= passage.priority * 100) {
                     workPassages.push(passage);
                 }
-            } else {
+
+                toDeleteByProbability.push(passage);
+            }
+        }
+
+        const remainingPassages = passages.filter(p => !toDeleteByProbability.includes(p));
+        const excludedIds = new Set<number>();
+
+        for (let n = remainingPassages.length - 1; n >= 0; n--) {
+            const passage = remainingPassages[n];
+
+            if (excludedIds.has(passage.id)) {
+                continue;
+            }
+
+            if (workPassages.includes(passage)) {
+                continue;
+            }
+
+            const controversials = (passage as any).controversials as Passage[] | undefined;
+
+            if ((!controversials || controversials.length === 0) && passage.priority >= 1) {
                 workPassages.push(passage);
+                continue;
+            }
+
+            const allControversials: Passage[] = [...(controversials ?? []), passage];
+
+            let last = 0;
+            const segments: { x: number; y: number }[] = [];
+
+            for (const controversialPassage of allControversials) {
+                const priority = Math.floor(controversialPassage.priority);
+                segments.push({ x: last, y: last + priority - 1 });
+                last += priority;
+            }
+
+            if (last <= 0) {
+                workPassages.push(allControversials[0]);
+            } else {
+                const randomValue = Math.floor(Math.random() * last);
+
+                let selectedIndex = 0;
+                for (let i = 0; i < segments.length; i++) {
+                    const segment = segments[i];
+
+                    if (randomValue >= segment.x && randomValue <= segment.y) {
+                        selectedIndex = i;
+                        break;
+                    }
+                }
+
+                workPassages.push(allControversials[selectedIndex]);
+            }
+
+            for (const controversialPassage of allControversials) {
+                excludedIds.add(controversialPassage.id);
             }
         }
 
@@ -53,7 +110,7 @@ export class PassageResolver {
     }
 
     private checkAllConditions(passage: Passage): boolean {
-        const toLocation = QuestService.findLocationWith(this.quest, passage.to);
+        const toLocation = this.quest.locations.find(l => l.id === passage.to);
 
         if (!toLocation) {
             return false;
@@ -70,7 +127,7 @@ export class PassageResolver {
 
         if (passage.logicalCondition) {
             try {
-                logicalCondition = this.evaluateBoolFormula(passage.logicalCondition);
+                logicalCondition = this.gameController.evaluateBoolFormulaPublic(passage.logicalCondition);
             } catch {
                 console.warn("Invalid logical condition formula!");
             }
@@ -80,39 +137,35 @@ export class PassageResolver {
             const parameter = this.quest.parameters[i];
 
             const necessaryRange = passage.necessaryRanges[i];
-            if (
-                necessaryRange &&
-                necessaryRange.isOn &&
-                (parameter.value < necessaryRange.min || parameter.value > necessaryRange.max)
-            ) {
+            if (necessaryRange?.isOn && (parameter.value < necessaryRange.min || parameter.value > necessaryRange.max)) {
                 inRange = false;
                 break;
             }
 
             const takenValues = passage.takenValues[i];
-            if (takenValues && takenValues.formula) {
+            if (takenValues?.formula) {
                 try {
-                    const value = this.evaluateNumberFormula(takenValues.formula);
+                    const value = this.gameController.evaluateNumberFormulaPublic(takenValues.formula);
 
-                    takesOrNotValues = takenValues.nonTaken
-                        ? parameter.value !== value
-                        : parameter.value === value;
+                    if (takenValues.nonTaken) {
+                        takesOrNotValues = parameter.value !== value;
+                    } else {
+                        takesOrNotValues = parameter.value === value;
+                    }
                 } catch {
                     console.warn("Invalid accepted values formula!");
                 }
             }
 
             const multipleValues = passage.multipleValues[i];
-            if (multipleValues && multipleValues.formula) {
+            if (multipleValues?.formula) {
                 try {
-                    const value = this.evaluateNumberFormula(multipleValues.formula);
+                    const value = this.gameController.evaluateNumberFormulaPublic(multipleValues.formula);
 
-                    if (value === 0) {
-                        multipleOrNotValues = false;
+                    if (multipleValues.nonMultiple) {
+                        multipleOrNotValues = parameter.value % value !== 0;
                     } else {
-                        multipleOrNotValues = multipleValues.nonMultiple
-                            ? parameter.value % value !== 0
-                            : parameter.value % value === 0;
+                        multipleOrNotValues = parameter.value % value === 0;
                     }
                 } catch {
                     console.warn("Invalid divisibility formula!");
@@ -120,42 +173,6 @@ export class PassageResolver {
             }
         }
 
-        return passCondition &&
-            logicalCondition &&
-            inRange &&
-            takesOrNotValues &&
-            multipleOrNotValues;
-    }
-
-    private evaluateNumberFormula(formula: string): number {
-        const dict = this.textParser.fillFormulaDict();
-
-        let prepared = formula;
-
-        for (const key of Object.keys(dict)) {
-            prepared = prepared.replaceAll(key, dict[key].toString());
-        }
-
-        if (!/^[0-9+\-*/%().\s]+$/.test(prepared)) {
-            throw new Error("Unsafe number formula");
-        }
-
-        return Math.floor(Function(`"use strict"; return (${prepared});`)());
-    }
-
-    private evaluateBoolFormula(formula: string): boolean {
-        const dict = this.textParser.fillFormulaDict();
-
-        let prepared = formula;
-
-        for (const key of Object.keys(dict)) {
-            prepared = prepared.replaceAll(key, dict[key].toString());
-        }
-
-        if (!/^[0-9+\-*/%().<>=!&| \s]+$/.test(prepared)) {
-            throw new Error("Unsafe bool formula");
-        }
-
-        return Boolean(Function(`"use strict"; return (${prepared});`)());
+        return passCondition && logicalCondition && inRange && takesOrNotValues && multipleOrNotValues;
     }
 }

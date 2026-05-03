@@ -1,241 +1,357 @@
 import { Quest } from "../_Data/Quest";
-import { Player } from "../_Data/Player";
 import { Location } from "../_Data/Location";
 import { Passage } from "../_Data/Passage";
 import { LocationType } from "../_Data/_Enums/LocationType";
-
-import { QuestService } from "./QuestService";
-import { TextParser } from "./TextParser";
 import { PassageResolver } from "./PassageResolver";
-import { LocationDescriptionResolver } from "./LocationDescriptionResolver";
-import { PassageInfo } from "./PassageInfo";
+import { FormulaEvaluator } from "./FormulaEvaluator";
+import { TextParser } from "./TextParser";
+
+export type ChoiceView = {
+    id: number;
+    question: string;
+};
 
 export type GameViewState = {
     title: string;
     mainText: string;
-    choices: Passage[];
-    gameOver: boolean;
+    params: string[];
+    choices: ChoiceView[];
     result: "none" | "victory" | "fail";
 };
 
 export class GameController {
-
-    private player: Player | null = null;
+    private quest: Quest | null = null;
+    private currentLocation: Location | null = null;
     private singlePassage: Passage | null = null;
-
-    private textParser: TextParser | null = null;
-    private locationDescriptionResolver: LocationDescriptionResolver | null = null;
     private passageResolver: PassageResolver | null = null;
+    private textParser: TextParser | null = null;
 
     startQuest(quest: Quest): GameViewState {
-        this.createPlayer(quest);
-        return this.showCurrentLocation();
-    }
 
-    choosePassage(passageId: number): GameViewState {
-        if (!this.player || this.player.gameOver) {
-            return this.getEmptyState();
-        }
+        this.quest = structuredClone(quest);
 
-        const passage = QuestService.findPassageWith(this.player.quest, passageId);
+        this.initQuestRuntimeState();
+        this.initControversials();
 
-        if (!passage) {
-            return this.getCurrentState();
-        }
+        this.textParser = new TextParser(this.quest);
+        this.passageResolver = new PassageResolver(this.quest, this);
 
-        this.player.locationID = passage.to;
-        this.player.passageID = passage.id;
-
-        return this.showPassage(passage);
-    }
-
-    actionNext(): GameViewState {
-        if (!this.singlePassage || !this.player) {
-            return this.getCurrentState();
-        }
-
-        this.player.locationID = this.singlePassage.to;
-        this.player.passageID = this.singlePassage.id;
-
-        const passage = this.singlePassage;
-        this.singlePassage = null;
-
-        return this.showPassage(passage);
-    }
-
-    private createPlayer(quest: Quest): void {
-        const questClone = structuredClone(quest);
-        const startLocation = QuestService.findStartLocation(questClone);
+        const startLocation = this.quest.locations.find(l => l.locationType === LocationType.Start);
 
         if (!startLocation) {
             throw new Error("Start location not found");
         }
 
-        this.player = {
-            locationID: startLocation.id,
-            passageID: 0,
-            gameOver: false,
-            quest: questClone
-        };
+        this.currentLocation = startLocation;
 
-        for (const location of questClone.locations) {
-            location.visitCounter = 0;
+        return this.showCurrentLocation();
+    }
+
+    choosePassage(passageId: number): GameViewState {
+        if (passageId === -1) {
+            return this.actionNext();
         }
 
-        for (const passage of questClone.passages) {
-            passage.visitCounter = 0;
+        if (!this.quest) {
+            return this.emptyState();
         }
 
-        for (const parameter of questClone.parameters) {
-            parameter.value = parameter.startValue;
+        const passage = this.quest.passages.find(p => p.id === passageId);
+
+        if (!passage) {
+            return this.showCurrentLocation();
+        }
+
+        return this.showPassage(passage);
+    }
+
+    private actionNext(): GameViewState {
+        if (!this.singlePassage || !this.currentLocation) {
+            return this.showCurrentLocation();
         }
 
         this.singlePassage = null;
 
-        this.textParser = new TextParser(questClone);
-        this.locationDescriptionResolver = new LocationDescriptionResolver(this.textParser);
-        this.passageResolver = new PassageResolver(questClone, this.textParser);
+        return this.showCurrentLocation();
     }
 
     private showCurrentLocation(): GameViewState {
-        if (!this.player || !this.textParser || !this.locationDescriptionResolver || !this.passageResolver) {
-            return this.getEmptyState();
+        if (!this.quest || !this.currentLocation) {
+            return this.emptyState();
         }
 
-        const location = QuestService.findLocationWith(this.player.quest, this.player.locationID);
+        this.applyInfluences(this.currentLocation);
+        this.applyParamsActions(this.currentLocation);
 
-        if (!location) {
-            return this.getEmptyState();
+        const description = this.getLocationDescription(this.currentLocation);
+        const mainText = this.cleanText(description);
+
+        if (this.currentLocation.locationType === LocationType.Victory) {
+            this.currentLocation.visitCounter++;
+            return this.makeState(mainText, [], "victory");
         }
 
-        const mainText = this.showLocationContent(location);
-
-        if (this.isLocationType(location, LocationType.Victory)) {
-            this.player.gameOver = true;
-
-            return {
-                title: this.getQuestTitle(),
-                mainText,
-                choices: [],
-                gameOver: true,
-                result: "victory"
-            };
+        if (this.currentLocation.locationType === LocationType.Fail) {
+            this.currentLocation.visitCounter++;
+            return this.makeState(mainText, [], "fail");
         }
 
-        if (this.isLocationType(location, LocationType.Fail)) {
-            this.player.gameOver = true;
+        const choices = this.passageResolver
+            ? this.passageResolver.resolveVisiblePassages(this.currentLocation)
+                .map(info => info.pass)
+                .map(p => ({
+                    id: p.id,
+                    question: this.parseText(p.question)
+                }))
+            : [];
 
-            return {
-                title: this.getQuestTitle(),
-                mainText,
-                choices: [],
-                gameOver: true,
-                result: "fail"
-            };
-        }
+        this.currentLocation.visitCounter++;
 
-        const visiblePassages = this.showLocationPassages(location);
+        return this.makeState(mainText, choices, "none");
+    }
 
-        location.visitCounter++;
+    public getQuest(): Quest | null {
+        return this.quest;
+    }
 
-        return {
-            title: this.getQuestTitle(),
-            mainText,
-            choices: visiblePassages.map(info => info.pass),
-            gameOver: false,
-            result: "none"
-        };
+    public evaluateBoolFormulaPublic(formula: string): boolean {
+        return this.evaluateBoolFormula(formula);
+    }
+
+    public evaluateNumberFormulaPublic(formula: string): number {
+        return this.evaluateNumberFormula(formula);
     }
 
     private showPassage(passage: Passage): GameViewState {
-        if (!this.player || !this.textParser) {
-            return this.getEmptyState();
+        if (!this.quest) {
+            return this.emptyState();
         }
 
-        this.singlePassage = null;
+        this.applyInfluences(passage);
+        this.applyParamsActions(passage);
 
         passage.visitCounter++;
 
-        const location = QuestService.findLocationWith(this.player.quest, this.player.locationID);
+        const nextLocation = this.quest.locations.find(l => l.id === passage.to);
 
-        if (!location) {
-            return this.getEmptyState();
+        if (!nextLocation) {
+            console.warn("Next location not found:", passage.to);
+            return this.showCurrentLocation();
         }
 
-        if (!passage.description || this.isLocationType(location, LocationType.Empty)) {
-            if (this.isLocationType(location, LocationType.Empty) && passage.description) {
-                location.descriptions[0] = passage.description;
+        this.currentLocation = nextLocation;
+
+        if (!passage.description || this.currentLocation.locationType === LocationType.Empty) {
+            if (this.currentLocation.locationType === LocationType.Empty && passage.description) {
+                this.currentLocation.descriptions[0] = passage.description;
             }
 
             return this.showCurrentLocation();
         }
 
-        const mainText = this.textParser.parse(passage.description);
+        this.singlePassage = passage;
 
-        const nextPassage: Passage = {
-            ...passage,
-            id: -1,
-            to: passage.to,
-            question: "Next",
-            description: "",
-            ignoreDemonstration: true
-        };
-
-        this.singlePassage = nextPassage;
-
-        return {
-            title: this.getQuestTitle(),
-            mainText,
-            choices: [nextPassage],
-            gameOver: false,
-            result: "none"
-        };
+        return this.makeState(
+            this.cleanText(passage.description),
+            [{ id: -1, question: "Next" }],
+            "none"
+        );
     }
 
-    private showLocationContent(location: Location): string {
-        if (!this.locationDescriptionResolver || !this.textParser) {
+    private initQuestRuntimeState(): void {
+        if (!this.quest) return;
+
+        for (const location of this.quest.locations) {
+            location.visitCounter = 0;
+        }
+
+        for (const passage of this.quest.passages) {
+            passage.visitCounter = 0;
+        }
+
+        for (const parameter of this.quest.parameters) {
+            parameter.value = parameter.startValue;
+        }
+    }
+
+    private initControversials(): void {
+        if (!this.quest) return;
+
+        for (const passage of this.quest.passages) {
+            (passage as any).controversials = [];
+
+            for (const other of this.quest.passages) {
+                if (
+                    other.from === passage.from &&
+                    other.id !== passage.id &&
+                    other.question === passage.question
+                ) {
+                    (passage as any).controversials.push(other);
+                }
+            }
+        }
+    }
+
+    private applyInfluences(unit: any): void {
+        if (!this.quest || !unit?.influences) return;
+
+        for (let i = 0; i < unit.influences.length; i++) {
+            const parameter = this.quest.parameters[i];
+            const influence = unit.influences[i];
+
+            if (!parameter || !influence || !parameter.isActive) continue;
+
+            switch (influence.influenceType) {
+                case "Units":
+                    parameter.value = this.clamp(parameter.value + influence.value, parameter.minValue, parameter.maxValue);
+                    break;
+
+                case "Percent":
+                    parameter.value = this.clamp(
+                        Math.floor(parameter.value * (influence.value / 100 + 1)),
+                        parameter.minValue,
+                        parameter.maxValue
+                    );
+                    break;
+
+                case "Value":
+                    parameter.value = this.clamp(influence.value, parameter.minValue, parameter.maxValue);
+                    break;
+
+                case "Formula":
+                    if (influence.formula) {
+                        parameter.value = this.clamp(
+                            this.evaluateNumberFormula(influence.formula),
+                            parameter.minValue,
+                            parameter.maxValue
+                        );
+                    }
+                    break;
+            }
+        }
+    }
+
+    private applyParamsActions(unit: any): void {
+        if (!this.quest || !unit?.paramsActions) return;
+
+        for (let i = 0; i < this.quest.parameters.length; i++) {
+            const parameter = this.quest.parameters[i];
+            const action = unit.paramsActions[i];
+
+            if (!parameter || !action) continue;
+
+            if (action === "Hide") parameter.isHidden = true;
+            if (action === "Show") parameter.isHidden = false;
+        }
+    }
+
+    private getVisibleParams(): string[] {
+        if (!this.quest) return [];
+
+        const result: string[] = [];
+
+        for (const parameter of this.quest.parameters) {
+            if (!parameter.isActive || parameter.isHidden) continue;
+
+            const range = parameter.paramsRanges?.find(r =>
+                r.min <= parameter.value && r.max >= parameter.value
+            );
+
+            if (!range || !range.output) continue;
+
+            let output = range.output.replace("<>", parameter.value.toString());
+            output = this.parseText(output);
+
+            for (const p of this.quest.parameters) {
+                output = output.replaceAll(`p${p.index}`, p.value.toString());
+            }
+
+            result.push(output);
+        }
+
+        return result;
+    }
+
+    private getLocationDescription(location: Location): string {
+        if (!location.descriptions || location.descriptions.length === 0) {
             return "";
         }
 
-        const description = this.locationDescriptionResolver.resolve(location);
-        return this.textParser.parse(description);
-    }
-
-    private showLocationPassages(location: Location): PassageInfo[] {
-        if (!this.player || this.player.gameOver || !this.passageResolver) {
-            return [];
+        if (location.descriptions.length === 1 || location.locationType === LocationType.Empty) {
+            return location.descriptions[0];
         }
 
-        return this.passageResolver.resolveVisiblePassages(location);
-    }
+        if (location.chooseWithFormula && location.formula) {
+            const index = this.evaluateNumberFormula(location.formula) - 1;
 
-    private getCurrentState(): GameViewState {
-        if (!this.player) {
-            return this.getEmptyState();
+            if (index >= 0 && index < location.descriptions.length) {
+                return location.descriptions[index];
+            }
+
+            return location.descriptions[0];
         }
 
-        return this.showCurrentLocation();
+        const index = location.visitCounter % location.descriptions.length;
+        return location.descriptions[index];
     }
 
-    private getEmptyState(): GameViewState {
+    private evaluateBoolFormula(formula: string): boolean {
+        return FormulaEvaluator.evaluateBool(formula, this.fillFormulaDict());
+    }
+
+    private evaluateNumberFormula(formula: string): number {
+        return FormulaEvaluator.evaluate(formula, this.fillFormulaDict());
+    }
+
+    private fillFormulaDict(): Record<string, number> {
+        const dict: Record<string, number> = {};
+
+        if (!this.quest) {
+            return dict;
+        }
+
+        for (const parameter of this.quest.parameters) {
+            dict["p" + parameter.index] = parameter.value;
+        }
+
+        return dict;
+    }
+
+    private cleanText(text: string): string {
+        if (!text) return "";
+
+        return this.parseText(text)
+            .split("\n").join("<br>")
+            .replace(/<im .*? im>/g, "")
+            .replace(/<so .*? so>/g, "")
+            .replace(/<mu .*? mu>/g, "");
+    }
+
+    private parseText(text: string): string {
+        return this.textParser ? this.textParser.parse(text) : text;
+    }
+
+    private makeState(mainText: string, choices: ChoiceView[], result: GameViewState["result"]): GameViewState {
+        return {
+            title: this.quest ? this.quest.displayName || this.quest.questName : "",
+            mainText,
+            params: this.getVisibleParams(),
+            choices,
+            result
+        };
+    }
+
+    private emptyState(): GameViewState {
         return {
             title: "",
             mainText: "",
+            params: [],
             choices: [],
-            gameOver: false,
             result: "none"
         };
     }
 
-    private getQuestTitle(): string {
-        if (!this.player) {
-            return "";
-        }
-
-        return this.player.quest.displayName || this.player.quest.questName;
-    }
-
-    private isLocationType(location: Location, type: LocationType): boolean {
-        return location.locationType as LocationType === type;
+    private clamp(value: number, min: number, max: number): number {
+        return Math.max(min, Math.min(max, value));
     }
 }

@@ -1,4 +1,5 @@
 import { Quest } from "../_Data/Quest";
+import { FormulaEvaluator } from "./FormulaEvaluator";
 
 export class TextParser {
 
@@ -18,7 +19,7 @@ export class TextParser {
                     .replace("{", "")
                     .replace("}", "");
 
-                const value = this.evaluateSimpleFormula(cleanExpression);
+                const value = FormulaEvaluator.evaluate(cleanExpression, this.fillFormulaDict());
 
                 const replacement = ignoreColor
                     ? value.toString()
@@ -83,19 +84,4 @@ export class TextParser {
         return value;
     }
 
-    private evaluateSimpleFormula(expression: string): number {
-        const dict = this.fillFormulaDict();
-
-        let prepared = expression;
-
-        for (const key of Object.keys(dict)) {
-            prepared = prepared.replaceAll(key, dict[key].toString());
-        }
-
-        if (!/^[0-9+\-*/%().\s]+$/.test(prepared)) {
-            throw new Error("Unsafe formula");
-        }
-
-        return Math.floor(Function(`"use strict"; return (${prepared});`)());
-    }
 }

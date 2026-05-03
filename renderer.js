@@ -1,9 +1,10 @@
+const { GameController } = require("./dist/_Core/GameController");
+
 const fs = require("fs");
 const path = require("path");
 
 let quest = null;
-let currentLocation = null;
-let singlePassage = null;
+let gameController = null;
 
 const titleEl = document.getElementById("title");
 const textEl = document.getElementById("mainText");
@@ -18,134 +19,58 @@ function loadQuest() {
 }
 
 function startQuest() {
-    initParameters();
-    initControversials();
+    gameController = new GameController();
+    const state = gameController.startQuest(quest);
 
-    const startLocation = quest.locations.find(l => l.locationType === "Start");
-
-    if (!startLocation) {
-        throw new Error("Start location not found");
-    }
-
-    currentLocation = startLocation;
-    currentLocation.visitCounter++;
-
-    showCurrentLocation();
+    renderState(state);
 }
 
-function initParameters() {
-    for (const parameter of quest.parameters) {
-        parameter.value = parameter.startValue;
+function choosePassage(passageId) {
+    const state = gameController.choosePassage(passageId);
+    renderState(state);
+}
+
+function renderState(state) {
+    titleEl.textContent = state.title;
+    textEl.innerHTML = state.mainText;
+
+    renderParams(state.params);
+    renderChoices(state);
+}
+
+function renderParams(params) {
+    paramsEl.innerHTML = "";
+
+    for (const text of params) {
+        const div = document.createElement("div");
+        div.className = "param";
+        div.textContent = text;
+        paramsEl.appendChild(div);
     }
 }
 
-function showCurrentLocation() {
-    clearChoices();
+function renderChoices(state) {
+    choicesEl.innerHTML = "";
 
-    titleEl.textContent = quest.displayName || quest.questName;
-
-    applyInfluences(currentLocation);
-    applyParamsActions(currentLocation);
-
-    const description = getLocationDescription(currentLocation);
-    textEl.innerHTML = cleanText(description);
-
-    renderParams();
-
-    textEl.innerHTML = cleanText(description);
-
-    if (currentLocation.locationType === "Victory") {
+    if (state.result === "victory") {
         addSystemButton("You win", returnToMenu);
         return;
     }
 
-    if (currentLocation.locationType === "Fail") {
+    if (state.result === "fail") {
         addSystemButton("You lose", returnToMenu);
         return;
     }
 
-    const passages = buildWorkPassages(currentLocation)
-        .filter(p => isPassageAvailable(p))
-        .sort((a, b) => a.displayOrder - b.displayOrder);
-
-    for (const passage of passages) {
-        addPassageButton(passage);
+    for (const choice of state.choices) {
+        addChoiceButton(choice);
     }
 }
 
-function showPassage(passage) {
-
-    applyInfluences(passage);
-    applyParamsActions(passage);
-    renderParams();
-
-    passage.visitCounter++;
-
-    const nextLocation = quest.locations.find(l => l.id === passage.to);
-
-    if (!nextLocation) {
-        console.warn("Next location not found:", passage.to);
-        return;
-    }
-
-    currentLocation = nextLocation;
-
-    if (!passage.description || currentLocation.locationType === "Empty") {
-        if (currentLocation.locationType === "Empty" && passage.description) {
-            currentLocation.descriptions[0] = passage.description;
-        }
-
-        currentLocation.visitCounter++;
-        showCurrentLocation();
-        return;
-    }
-
-    clearChoices();
-
-    textEl.innerHTML = cleanText(passage.description);
-
-    singlePassage = passage;
-
-    addSystemButton("Next", () => {
-        singlePassage = null;
-        currentLocation.visitCounter++;
-        showCurrentLocation();
-    });
-}
-
-function getLocationDescription(location) {
-    if (!location.descriptions || location.descriptions.length === 0) {
-        return "";
-    }
-
-    if (location.descriptions.length === 1 || location.locationType === "Empty") {
-        return location.descriptions[0];
-    }
-
-    const index = location.visitCounter % location.descriptions.length;
-    return location.descriptions[index];
-}
-
-function cleanText(text) {
-    if (!text) {
-        return "";
-    }
-
-    return text
-        .replaceAll("\n", "<br>")
-        .replace(/<im .*? im>/g, "")
-        .replace(/<so .*? so>/g, "")
-        .replace(/<mu .*? mu>/g, "");
-}
-
-function clearChoices() {
-    choicesEl.innerHTML = "";
-}
-
-function addPassageButton(passage) {
+function addChoiceButton(choice) {
     const button = document.createElement("button");
-    button.textContent = passage.question;
-    button.onclick = () => showPassage(passage);
+    button.textContent = choice.question;
+    button.onclick = () => choosePassage(choice.id);
 
     choicesEl.appendChild(button);
 }
@@ -158,157 +83,14 @@ function addSystemButton(text, action) {
     choicesEl.appendChild(button);
 }
 
-function applyInfluences(unit) {
-    if (!unit || !unit.influences || !quest.parameters) {
-        return;
-    }
-
-    for (let i = 0; i < unit.influences.length; i++) {
-        const parameter = quest.parameters[i];
-        const influence = unit.influences[i];
-
-        if (!parameter || !influence || !parameter.isActive) {
-            continue;
-        }
-
-        switch (influence.influenceType) {
-            case "Units":
-                parameter.value = clamp(parameter.value + influence.value, parameter.minValue, parameter.maxValue);
-                break;
-
-            case "Percent":
-                parameter.value = clamp(
-                    Math.floor(parameter.value * (influence.value / 100 + 1)),
-                    parameter.minValue,
-                    parameter.maxValue
-                );
-                break;
-
-            case "Value":
-                parameter.value = clamp(influence.value, parameter.minValue, parameter.maxValue);
-                break;
-
-            case "Formula":
-                // позже подключим нормальный evaluator
-                break;
-        }
-    }
-}
-
-function applyParamsActions(unit) {
-    if (!unit || !unit.paramsActions || !quest.parameters) {
-        return;
-    }
-
-    for (let i = 0; i < quest.parameters.length; i++) {
-        const parameter = quest.parameters[i];
-        const action = unit.paramsActions[i];
-
-        if (!parameter || !action) {
-            continue;
-        }
-
-        if (action === "Hide") {
-            parameter.isHidden = true;
-        }
-
-        if (action === "Show") {
-            parameter.isHidden = false;
-        }
-    }
-}
-
-function renderParams() {
-    paramsEl.innerHTML = "";
-
-    for (const parameter of quest.parameters) {
-        if (!parameter.isActive || parameter.isHidden) {
-            continue;
-        }
-
-        const range = findCorrectRange(parameter);
-
-        if (!range || !range.output) {
-            continue;
-        }
-
-        const text = range.output.replace("<>", parameter.value.toString());
-
-        const div = document.createElement("div");
-        div.className = "param";
-        div.textContent = text;
-
-        paramsEl.appendChild(div);
-    }
-}
-
-function findCorrectRange(parameter) {
-    if (!parameter.paramsRanges) {
-        return null;
-    }
-
-    return parameter.paramsRanges.find(range =>
-        range.min <= parameter.value && range.max >= parameter.value
-    ) || null;
-}
-
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-}
-
-function isPassageAvailable(passage) {
-
-    if (passage.passability > 0 &&
-        passage.visitCounter >= passage.passability) {
-        return false;
-    }
-
-    if (passage.logicalCondition) {
-        return evaluateBoolFormula(passage.logicalCondition);
-    }
-
-    return true;
-}
-
-function evaluateBoolFormula(formula) {
-    let prepared = replaceParametersInFormula(formula);
-
-    prepared = prepared.replaceAll("==", "===");
-
-    if (!/^[0-9+\-*/%().<>=!&|?\s:]+$/.test(prepared)) {
-        console.warn("Unsafe bool formula:", formula, "=>", prepared);
-        return false;
-    }
-
-    try {
-        return Boolean(Function(`"use strict"; return (${prepared});`)());
-    } catch (e) {
-        console.warn("Invalid bool formula:", formula, e);
-        return false;
-    }
-}
-
-function replaceParametersInFormula(formula) {
-    let prepared = formula;
-
-    for (const parameter of quest.parameters) {
-        const key = "p" + parameter.index;
-        prepared = prepared.replaceAll(key, parameter.value.toString());
-    }
-
-    return prepared;
-}
-
 function returnToMenu() {
     quest = null;
-    currentLocation = null;
-    singlePassage = null;
+    gameController = null;
 
     titleEl.textContent = "Quest Reader";
     textEl.innerHTML = "First Electron App";
     paramsEl.innerHTML = "";
-
-    clearChoices();
+    choicesEl.innerHTML = "";
 
     const button = document.createElement("button");
     button.id = "startBtn";
@@ -319,99 +101,6 @@ function returnToMenu() {
     };
 
     choicesEl.appendChild(button);
-}
-
-function initControversials() {
-    for (const passage of quest.passages) {
-        passage.controversials = [];
-
-        for (const other of quest.passages) {
-            if (
-                other.from === passage.from &&
-                other.id !== passage.id &&
-                other.question === passage.question
-            ) {
-                passage.controversials.push(other);
-            }
-        }
-    }
-}
-
-function buildWorkPassages(location) {
-    const passages = quest.passages.filter(p => p.from === location.id);
-    const workPassages = [];
-
-    const probabilityPassages = [];
-
-    for (const passage of passages) {
-        if (passage.priority < 1) {
-            if (Math.random() * 100 <= passage.priority * 100) {
-                workPassages.push(passage);
-            }
-
-            probabilityPassages.push(passage);
-        }
-    }
-
-    const normalPassages = passages.filter(p => !probabilityPassages.includes(p));
-
-    const excludedIds = new Set();
-
-    for (let n = normalPassages.length - 1; n >= 0; n--) {
-        const passage = normalPassages[n];
-
-        if (excludedIds.has(passage.id)) {
-            continue;
-        }
-
-        if (workPassages.includes(passage)) {
-            continue;
-        }
-
-        if ((!passage.controversials || passage.controversials.length === 0) && passage.priority >= 1) {
-            workPassages.push(passage);
-            continue;
-        }
-
-        const allControversials = [...passage.controversials, passage];
-        const selected = selectControversialByPriority(allControversials);
-
-        workPassages.push(selected);
-
-        for (const controversialPassage of allControversials) {
-            excludedIds.add(controversialPassage.id);
-        }
-    }
-
-    return workPassages;
-}
-
-function selectControversialByPriority(passages) {
-    let total = 0;
-
-    for (const passage of passages) {
-        total += Math.floor(passage.priority);
-    }
-
-    if (total <= 0) {
-        return passages[0];
-    }
-
-    const randomValue = Math.floor(Math.random() * total);
-
-    let current = 0;
-
-    for (const passage of passages) {
-        const weight = Math.floor(passage.priority);
-
-        if (randomValue >= current && randomValue < current + weight) {
-            return passage;
-        }
-
-        current += weight;
-    }
-
-    return passages[0];
 }
 
 document.getElementById("startBtn").addEventListener("click", () => {
