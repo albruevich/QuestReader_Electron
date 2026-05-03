@@ -78,12 +78,31 @@ The reader automatically detects all valid quest folders.
 
 ## How to Run
 
-### From Source
+### 1. Install Node.js
+
+Download and install the **LTS** version:
+
+https://nodejs.org/
+
+### 2. Open the project folder
+
+Open the folder in:
+
+- Terminal (macOS / Linux)
+- Command Prompt or PowerShell (Windows)
+
+(Optional: you may also open it in Visual Studio Code)
+
+### 3. Install dependencies
 
 ```bash
 npm install
+
+### 4. Start the application
+
 npm start
-```
+
+This command will compile the TypeScript code and launch the Electron app.
 
 ---
 
