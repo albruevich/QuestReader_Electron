@@ -2,14 +2,12 @@
 
 # Quest Reader Electron
 
-![Platform](https://img.shields.io/badge/platform-Desktop-green)
 ![Framework](https://img.shields.io/badge/framework-Electron-47848F?logo=electron&logoColor=white)
 ![Language](https://img.shields.io/badge/language-TypeScript-blue)
-![Runtime](https://img.shields.io/badge/runtime-Node.js-339933?logo=node.js&logoColor=white)
-![Format](https://img.shields.io/badge/data-JSON-orange)
+![Data](https://img.shields.io/badge/data-JSON-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-A desktop Electron port of the **Text Quest Reader** project for running branching narrative quests with parameters, choices, images, music, and sound effects.
+A desktop Electron application for running branching narrative quests with parameters, choices, images, music, and sound effects.
 
 Inspired by the mechanics of the classic game **Space Rangers**.
 
