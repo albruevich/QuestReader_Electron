@@ -27,7 +27,7 @@ Together with the [Text Quest Editor](https://github.com/albruevich/Text-Quest-E
 
 The project is written in **TypeScript**, running inside **Electron**.
 
-It was created as an experiment in transferring a production-style quest system from Unity into a desktop JavaScript stack.
+It was designed as a standalone desktop application for interactive text quests with a flexible data-driven architecture.
 
 The project can be used:
 
