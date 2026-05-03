@@ -432,10 +432,6 @@ export class GameController {
                 continue;
             }
 
-            if (!parameter.criticText || parameter.criticText.trim() === "") {
-                continue;
-            }
-
             const isCriticalMax = parameter.isCriticMax === true;
 
             const isCritical = isCriticalMax
@@ -446,12 +442,16 @@ export class GameController {
                 continue;
             }
 
-            const failText = parameter.criticText;
+            const criticText = parameter.criticText || "";
+            const critResources = this.getCritResourcesText(parameter);
 
-            const imageName = this.extractImageName(failText);
-            const musicName = this.extractMusicName(failText);
-            const soundName = this.extractSoundName(failText);
-            const mainText = this.cleanText(failText);
+            const fullFailText = `${criticText}\n${critResources}`;
+
+            const imageName = this.extractImageName(fullFailText);
+            const musicName = this.extractMusicName(fullFailText);
+            const soundName = this.extractSoundName(fullFailText);
+
+            const mainText = this.cleanText(criticText);
 
             return this.makeState(
                 mainText,
@@ -464,5 +464,21 @@ export class GameController {
         }
 
         return null;
+    }
+
+    private getCritResourcesText(parameter: any): string {
+        if (!parameter || !parameter.critResources) {
+            return "";
+        }
+
+        if (typeof parameter.critResources === "string") {
+            return parameter.critResources;
+        }
+
+        if (Array.isArray(parameter.critResources)) {
+            return parameter.critResources.join("\n");
+        }
+
+        return String(parameter.critResources);
     }
 }
