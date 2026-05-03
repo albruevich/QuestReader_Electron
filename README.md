@@ -11,7 +11,7 @@ A desktop Electron application for running branching narrative quests with param
 
 Inspired by the mechanics of the classic game **Space Rangers**.
 
-This project demonstrates how gameplay logic originally built in Unity/C# can be successfully ported to **TypeScript + Electron** while preserving data compatibility and core quest systems.
+This project uses a data-driven quest system with JSON content, branching logic, parameters, multimedia support, and desktop-friendly controls.
 
 Together with the [Text Quest Editor](https://github.com/albruevich/Text-Quest-Editor), it forms a complete toolchain for creating and playing custom text quests.
 
