@@ -11,8 +11,6 @@ A desktop Electron application for running branching narrative quests with param
 
 Inspired by the mechanics of the classic game **Space Rangers**.
 
-This project uses a data-driven quest system with JSON content, branching logic, parameters, multimedia support, and desktop-friendly controls.
-
 Together with the [Text Quest Editor](https://github.com/albruevich/Text-Quest-Editor), it forms a complete toolchain for creating and playing custom text quests.
 
 ---
@@ -25,25 +23,24 @@ Together with the [Text Quest Editor](https://github.com/albruevich/Text-Quest-E
 
 ## About the Project
 
-The project is written in **TypeScript**, running inside **Electron**.
+The project is written in **TypeScript** and built with **Electron**.
 
-It was designed as a standalone desktop application for interactive text quests with a flexible data-driven architecture.
+It is a standalone desktop application for interactive text quests with a flexible JSON-driven architecture.
 
-The project can be used:
+Use cases:
 
-- to play included quests such as **Asteroid Station**
-- to test quests created in the Text Quest Editor
-- as a base for your own desktop narrative reader
-- as an example of porting gameplay systems across technologies
+- play included quests such as **Asteroid Station**
+- test quests created in the Text Quest Editor
+- use as a base for your own narrative reader
 
 ---
 
 ## Features
 
 - Branching quest structure with multiple outcomes
-- State parameters affecting progression and choices
+- Parameters affecting progression and choices
 - Conditional transitions based on quest logic
-- Support for images, sound effects, and background music
+- Images, sound effects, and background music
 - Keyboard and mouse navigation
 - JSON-based quest content system
 
@@ -70,7 +67,7 @@ _Quests/
 
 ### Contents
 
-- `quest.json` — main quest file (logic + data)
+- `quest.json` — main quest file
 - `Images/` — optional images
 - `Sounds/` — optional sound effects
 - `Musics/` — optional music
@@ -90,13 +87,7 @@ npm start
 
 ---
 
-## Quick Test
-
-After launch:
-
-1. Select a quest  
-2. Press **Start Selected Quest**  
-3. Play using mouse or keyboard:
+## Controls
 
 - `↑ / ↓` — navigate choices
 - `Enter` — confirm
@@ -106,23 +97,18 @@ After launch:
 
 ## Technical Highlights
 
-- Desktop application development with Electron
-- TypeScript-based project structure
+- Electron desktop application
+- TypeScript project structure
 - JSON-driven content architecture
 - Local file system resource loading
-- Multimedia integration (images, audio, music)
-- Keyboard-focused desktop UX
-- Modular quest/gameplay logic
+- Multimedia integration
+- Modular quest logic
 
 ---
 
 ## Related Projects
 
-### Unity Version
-
 [Text Quest Reader (Unity)](https://github.com/albruevich/Text-Quest-Reader)
-
-### Quest Creation Tool
 
 [Text Quest Editor](https://github.com/albruevich/Text-Quest-Editor)
 
