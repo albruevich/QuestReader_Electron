@@ -1,4 +1,5 @@
-html, body {
+html,
+body {
     margin: 0;
     width: 100%;
     height: 100%;
@@ -73,32 +74,36 @@ body {
 }
 
 .picture-panel {
+    position: relative;
+    overflow: hidden;
+
     width: 100%;
     aspect-ratio: 1 / 1;
     height: auto;
     flex: 0 0 auto;
 }
 
-.params-panel {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-}
+.picture-panel img {
+    position: absolute;
+    inset: 0;
 
-#mainImage {
     width: 100%;
     height: 100%;
+
     object-fit: cover;
-    display: none;
+    opacity: 0;
+
+    transition: opacity 0.65s ease-in-out;
 }
 
-.picture-panel.has-image #mainImage {
-    display: block;
+.picture-panel img.visible {
+    opacity: 1;
 }
 
 .params-panel {
     flex: 1;
     min-height: 140px;
+    overflow: auto;
 
     padding: 24px 20px;
     font-size: 17px;
@@ -158,10 +163,6 @@ button:disabled::before {
 
 button:disabled:hover {
     background: transparent;
-}
-
-button.selected {
-    background: rgba(0, 0, 0, 0.35);
 }
 
 .param {

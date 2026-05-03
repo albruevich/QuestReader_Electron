@@ -1,27 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<title>Quest Reader</title>
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <title>Quest Reader</title>
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-<div id="app">
-    <div id="leftColumn">
-        <div id="mainText" class="panel main-text-panel"></div>
-        <div id="choices" class="panel choices-panel"></div>
-    </div>
-
-    <div id="rightColumn">
-        <div id="mainPicture" class="panel picture-panel">
-            <img id="mainImage" alt="">
+    <div id="app">
+        <div id="leftColumn">
+            <div id="mainText" class="panel main-text-panel"></div>
+            <div id="choices" class="panel choices-panel"></div>
         </div>
 
-        <div id="params" class="panel params-panel"></div>
-    </div>
-</div>
+        <div id="rightColumn">
+            <div id="mainPicture" class="panel picture-panel">
+                <img id="imageBack" alt="">
+                <img id="imageFront" alt="">
+            </div>
 
-<script src="renderer.js"></script>
+            <div id="params" class="panel params-panel"></div>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
 </body>
+
 </html>

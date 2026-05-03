@@ -19,7 +19,11 @@ const textEl = document.getElementById("mainText");
 const choicesEl = document.getElementById("choices");
 const paramsEl = document.getElementById("params");
 const pictureEl = document.getElementById("mainPicture");
-const mainImageEl = document.getElementById("mainImage");
+const imageBackEl = document.getElementById("imageBack");
+const imageFrontEl = document.getElementById("imageFront");
+
+let isFrontImageActive = false;
+let currentImageUrl = null;
 
 const QUESTS_FOLDER = path.join(__dirname, "_Quests");
 
@@ -208,20 +212,39 @@ function renderQuestAudio(state) {
 }
 
 function renderQuestImage(imageName) {
-    if (!pictureEl || !mainImageEl) {
+    if (!pictureEl || !imageBackEl || !imageFrontEl) {
         return;
     }
 
     const imagePath = findImagePath(imageName);
 
     if (!imagePath) {
-        pictureEl.classList.remove("has-image");
-        mainImageEl.removeAttribute("src");
+        imageBackEl.classList.remove("visible");
+        imageFrontEl.classList.remove("visible");
+        imageBackEl.removeAttribute("src");
+        imageFrontEl.removeAttribute("src");
+        currentImageUrl = null;
         return;
     }
 
-    mainImageEl.src = pathToFileURL(imagePath).href;
-    pictureEl.classList.add("has-image");
+    const nextImageUrl = pathToFileURL(imagePath).href;
+
+    if (nextImageUrl === currentImageUrl) {
+        return;
+    }
+
+    const nextImageEl = isFrontImageActive ? imageBackEl : imageFrontEl;
+    const previousImageEl = isFrontImageActive ? imageFrontEl : imageBackEl;
+
+    nextImageEl.src = nextImageUrl;
+
+    requestAnimationFrame(() => {
+        nextImageEl.classList.add("visible");
+        previousImageEl.classList.remove("visible");
+    });
+
+    currentImageUrl = nextImageUrl;
+    isFrontImageActive = !isFrontImageActive;
 }
 
 function findImagePath(imageName) {
