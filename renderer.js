@@ -422,6 +422,8 @@ function returnToMenu() {
     document.body.classList.add("menu-mode");
     document.body.classList.remove("play-mode");
 
+    audioManager.stopMusic();
+
     if (titleEl) {
         titleEl.textContent = "Quest Reader";
     }
