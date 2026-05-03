@@ -2,15 +2,21 @@ const { GameController } = require("./dist/_Core/GameController");
 
 const fs = require("fs");
 const path = require("path");
+const { pathToFileURL } = require("url");
 
 let selectedQuestInfo = null;
 let quest = null;
 let gameController = null;
 
+let keyboardIndex = 0;
+let currentKeyboardButtons = [];
+
 const titleEl = document.getElementById("title");
 const textEl = document.getElementById("mainText");
 const choicesEl = document.getElementById("choices");
 const paramsEl = document.getElementById("params");
+const pictureEl = document.getElementById("mainPicture");
+const mainImageEl = document.getElementById("mainImage");
 
 const QUESTS_FOLDER = path.join(__dirname, "_Quests");
 
@@ -78,6 +84,7 @@ function findQuestFolders() {
         let questJson = null;
         let displayName = entry.name;
         let description = "";
+        let startImage = "";
         let order = 0;
 
         try {
@@ -94,6 +101,7 @@ function findQuestFolders() {
                 questJson.descrition ||
                 "";
 
+            startImage = questJson.startImage || "";
             order = Number(questJson.order || 0);
         }
         catch (error) {
@@ -104,6 +112,7 @@ function findQuestFolders() {
             folderName: entry.name,
             displayName,
             description,
+            startImage,
             order,
             folderPath: questFolderPath,
             questJsonPath
@@ -128,12 +137,14 @@ function loadQuest(questInfo) {
     selectedQuestInfo = questInfo;
 }
 
-function selectQuest(questInfo) {
+function selectQuest(questInfo, keepKeyboardIndex = false) {
     loadQuest(questInfo);
 
     textEl.innerHTML = buildQuestDescriptionHtml(questInfo);
+
+    renderQuestImage(questInfo.startImage);
     renderMenuButtons();
-    renderQuestList();
+    renderQuestList(keepKeyboardIndex);
 }
 
 function buildQuestDescriptionHtml(questInfo) {
@@ -149,6 +160,7 @@ function startQuest() {
     }
 
     document.body.classList.remove("menu-mode");
+    document.body.classList.add("play-mode");
 
     gameController = new GameController();
 
@@ -174,8 +186,63 @@ function renderState(state) {
 
     textEl.innerHTML = state.mainText;
 
+    renderQuestImage(state.imageName);
     renderParams(state.params);
     renderChoices(state);
+}
+
+function renderQuestImage(imageName) {
+    if (!pictureEl || !mainImageEl) {
+        return;
+    }
+
+    const imagePath = findImagePath(imageName);
+
+    if (!imagePath) {
+        pictureEl.classList.remove("has-image");
+        mainImageEl.removeAttribute("src");
+        return;
+    }
+
+    mainImageEl.src = pathToFileURL(imagePath).href;
+    pictureEl.classList.add("has-image");
+}
+
+function findImagePath(imageName) {
+    if (!selectedQuestInfo || !imageName) {
+        return null;
+    }
+
+    const imagesFolder = path.join(selectedQuestInfo.folderPath, "Images");
+    const cleanName = imageName.trim();
+
+    if (!fs.existsSync(imagesFolder)) {
+        return null;
+    }
+
+    const hasExtension = path.extname(cleanName) !== "";
+
+    if (hasExtension) {
+        const directPath = path.join(imagesFolder, cleanName);
+
+        if (fs.existsSync(directPath)) {
+            return directPath;
+        }
+
+        return null;
+    }
+
+    const extensions = [".png", ".jpg", ".jpeg", ".webp"];
+
+    for (const extension of extensions) {
+        const candidate = path.join(imagesFolder, cleanName + extension);
+
+        if (fs.existsSync(candidate)) {
+            return candidate;
+        }
+    }
+
+    return null;
 }
 
 function renderParams(params) {
@@ -196,17 +263,21 @@ function renderChoices(state) {
 
     if (state.result === "victory") {
         addSystemButton(t("win"), returnToMenu);
+        resetKeyboardSelection();
         return;
     }
 
     if (state.result === "fail") {
         addSystemButton(t("lose"), returnToMenu);
+        resetKeyboardSelection();
         return;
     }
 
     for (const choice of state.choices) {
         addChoiceButton(choice);
     }
+
+    resetKeyboardSelection();
 }
 
 function addChoiceButton(choice) {
@@ -220,6 +291,21 @@ function addChoiceButton(choice) {
 
     button.textContent = caption;
     button.disabled = choice.interactable === false;
+
+    button.onmouseenter = () => {
+        if (!gameController || button.disabled) {
+            return;
+        }
+
+        const buttons = Array.from(
+            choicesEl.querySelectorAll("button:not(:disabled)")
+        );
+
+        keyboardIndex = buttons.indexOf(button);
+        updateKeyboardSelection();
+
+        document.body.classList.remove("keyboard-mode");
+    };
 
     button.onclick = () => {
         if (choice.interactable === false) {
@@ -241,24 +327,25 @@ function addSystemButton(text, action) {
     choicesEl.appendChild(button);
 }
 
-function addQuestButton(questInfo) {
+function addQuestButton(questInfo, index) {
     const button = document.createElement("button");
 
     button.textContent = questInfo.displayName;
-    button.title = questInfo.folderPath;
+    button.dataset.questJsonPath = questInfo.questJsonPath;
 
     if (selectedQuestInfo && selectedQuestInfo.questJsonPath === questInfo.questJsonPath) {
         button.classList.add("selected");
     }
 
     button.onclick = () => {
-        selectQuest(questInfo);
+        keyboardIndex = index;
+        selectQuest(questInfo, true);
     };
 
     choicesEl.appendChild(button);
 }
 
-function renderQuestList() {
+function renderQuestList(keepKeyboardIndex = false) {
     choicesEl.innerHTML = "";
 
     const quests = findQuestFolders();
@@ -271,12 +358,19 @@ function renderQuestList() {
             "No quests found. Expected structure: _Quests/QuestFolder/quest.json";
 
         choicesEl.appendChild(info);
+        resetKeyboardSelection();
         return;
     }
 
-    for (const questInfo of quests) {
-        addQuestButton(questInfo);
+    for (let i = 0; i < quests.length; i++) {
+        addQuestButton(quests[i], i);
     }
+
+    if (!keepKeyboardIndex) {
+        keyboardIndex = 0;
+    }
+
+    updateKeyboardSelection();
 }
 
 function renderMenuButtons() {
@@ -297,6 +391,7 @@ function returnToMenu() {
     gameController = null;
 
     document.body.classList.add("menu-mode");
+    document.body.classList.remove("play-mode");
 
     if (titleEl) {
         titleEl.textContent = "Quest Reader";
@@ -310,6 +405,7 @@ function returnToMenu() {
     if (quests.length === 0) {
         selectedQuestInfo = null;
         textEl.innerHTML = "No quests found.";
+        renderQuestImage(null);
 
         const info = document.createElement("div");
         info.className = "param";
@@ -318,17 +414,150 @@ function returnToMenu() {
 
         choicesEl.appendChild(info);
         renderMenuButtons();
+        resetKeyboardSelection();
         return;
     }
 
-    // auto select first quest
     selectedQuestInfo = quests[0];
     loadQuest(selectedQuestInfo);
 
     textEl.innerHTML = buildQuestDescriptionHtml(selectedQuestInfo);
 
+    renderQuestImage(selectedQuestInfo.startImage);
     renderQuestList();
     renderMenuButtons();
 }
+
+function resetKeyboardSelection() {
+    keyboardIndex = 0;
+    updateKeyboardSelection();
+}
+
+function updateKeyboardSelection() {
+    currentKeyboardButtons = Array.from(
+        choicesEl.querySelectorAll("button:not(:disabled)")
+    );
+
+    for (const button of choicesEl.querySelectorAll("button")) {
+        if (gameController) {
+            button.classList.remove("selected");
+        }
+    }
+
+    if (currentKeyboardButtons.length === 0) {
+        keyboardIndex = 0;
+        return;
+    }
+
+    if (keyboardIndex < 0) {
+        keyboardIndex = currentKeyboardButtons.length - 1;
+    }
+
+    if (keyboardIndex >= currentKeyboardButtons.length) {
+        keyboardIndex = 0;
+    }
+
+    const selectedButton = currentKeyboardButtons[keyboardIndex];
+
+    if (gameController) {
+        selectedButton.classList.add("selected");
+    }
+
+    selectedButton.scrollIntoView({
+        block: "nearest"
+    });
+}
+
+function moveKeyboardSelection(direction) {
+    document.body.classList.add("keyboard-mode");
+
+    if (document.activeElement) {
+        document.activeElement.blur();
+    }
+
+    currentKeyboardButtons = Array.from(
+        choicesEl.querySelectorAll("button:not(:disabled)")
+    );
+
+    if (currentKeyboardButtons.length === 0) {
+        return;
+    }
+
+    keyboardIndex += direction;
+
+    if (keyboardIndex < 0) {
+        keyboardIndex = currentKeyboardButtons.length - 1;
+    }
+
+    if (keyboardIndex >= currentKeyboardButtons.length) {
+        keyboardIndex = 0;
+    }
+
+    if (!gameController) {
+        const quests = findQuestFolders();
+        const questInfo = quests[keyboardIndex];
+
+        if (questInfo) {
+            selectQuest(questInfo, true);
+        }
+
+        return;
+    }
+
+    updateKeyboardSelection();
+}
+
+function submitKeyboardSelection() {
+    if (!gameController && selectedQuestInfo) {
+        startQuest();
+        return;
+    }
+
+    currentKeyboardButtons = Array.from(
+        choicesEl.querySelectorAll("button:not(:disabled)")
+    );
+
+    if (currentKeyboardButtons.length === 0) {
+        return;
+    }
+
+    if (keyboardIndex < 0 || keyboardIndex >= currentKeyboardButtons.length) {
+        keyboardIndex = 0;
+    }
+
+    currentKeyboardButtons[keyboardIndex].click();
+}
+
+function leaveQuest() {
+    if (gameController) {
+        returnToMenu();
+    }
+}
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowUp") {
+        event.preventDefault();
+        moveKeyboardSelection(-1);
+        return;
+    }
+
+    if (event.key === "ArrowDown") {
+        event.preventDefault();
+        moveKeyboardSelection(1);
+        return;
+    }
+
+    if (event.key === "Enter") {
+        event.preventDefault();
+        submitKeyboardSelection();
+        return;
+    }
+
+    if (event.key === "Escape") {
+        event.preventDefault();
+        leaveQuest();
+        return;
+    }
+});
 
 returnToMenu();

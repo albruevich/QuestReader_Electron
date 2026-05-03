@@ -18,6 +18,7 @@ export type GameViewState = {
     params: string[];
     choices: ChoiceView[];
     result: "none" | "victory" | "fail";
+    imageName: string | null;
 };
 
 export class GameController {
@@ -28,7 +29,6 @@ export class GameController {
     private textParser: TextParser | null = null;
 
     startQuest(quest: Quest): GameViewState {
-
         this.quest = structuredClone(quest);
 
         this.initQuestRuntimeState();
@@ -85,16 +85,17 @@ export class GameController {
         this.applyParamsActions(this.currentLocation);
 
         const description = this.getLocationDescription(this.currentLocation);
+        const imageName = this.extractImageName(description);
         const mainText = this.cleanText(description);
 
         if (this.currentLocation.locationType === LocationType.Victory) {
             this.currentLocation.visitCounter++;
-            return this.makeState(mainText, [], "victory");
+            return this.makeState(mainText, [], "victory", imageName);
         }
 
         if (this.currentLocation.locationType === LocationType.Fail) {
             this.currentLocation.visitCounter++;
-            return this.makeState(mainText, [], "fail");
+            return this.makeState(mainText, [], "fail", imageName);
         }
 
         const choices = this.passageResolver
@@ -108,7 +109,7 @@ export class GameController {
 
         this.currentLocation.visitCounter++;
 
-        return this.makeState(mainText, choices, "none");
+        return this.makeState(mainText, choices, "none", imageName);
     }
 
     public getQuest(): Quest | null {
@@ -152,10 +153,13 @@ export class GameController {
 
         this.singlePassage = passage;
 
+        const imageName = this.extractImageName(passage.description);
+
         return this.makeState(
             this.cleanText(passage.description),
             [{ id: -1, question: "__NEXT__", interactable: true }],
-            "none"
+            "none",
+            imageName
         );
     }
 
@@ -318,6 +322,18 @@ export class GameController {
         return dict;
     }
 
+    private extractImageName(text: string): string | null {
+        if (!text) return null;
+
+        const matches = [...text.matchAll(/<im\s+(.+?)\s+im>/g)];
+
+        if (matches.length === 0) {
+            return null;
+        }
+
+        return matches[matches.length - 1][1].trim();
+    }
+
     private cleanText(text: string): string {
         if (!text) return "";
 
@@ -332,13 +348,19 @@ export class GameController {
         return this.textParser ? this.textParser.parse(text) : text;
     }
 
-    private makeState(mainText: string, choices: ChoiceView[], result: GameViewState["result"]): GameViewState {
+    private makeState(
+        mainText: string,
+        choices: ChoiceView[],
+        result: GameViewState["result"],
+        imageName: string | null
+    ): GameViewState {
         return {
             title: this.quest ? this.quest.displayName || this.quest.questName : "",
             mainText,
             params: this.getVisibleParams(),
             choices,
-            result
+            result,
+            imageName
         };
     }
 
@@ -348,7 +370,8 @@ export class GameController {
             mainText: "",
             params: [],
             choices: [],
-            result: "none"
+            result: "none",
+            imageName: null
         };
     }
 

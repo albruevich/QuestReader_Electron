@@ -136,6 +136,14 @@ button::before {
 }
 
 button:hover {
+    background: transparent;
+}
+
+body.play-mode button:hover {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+button.selected {
     background: rgba(0, 0, 0, 0.35);
 }
 
@@ -200,4 +208,19 @@ body.menu-mode .params-panel {
 
 .panel::-webkit-scrollbar-thumb:hover {
     background: rgba(201, 196, 154, 0.65);
+}
+
+body.keyboard-mode.play-mode button:hover {
+    background: transparent;
+}
+
+body.play-mode.keyboard-mode #choices button:not(.selected):hover {
+    background: transparent !important;
+}
+
+body.play-mode #choices button.selected,
+body.play-mode #choices button.selected:hover,
+body.play-mode.keyboard-mode #choices button.selected,
+body.play-mode.keyboard-mode #choices button.selected:hover {
+    background: rgba(0, 0, 0, 0.35) !important;
 }
