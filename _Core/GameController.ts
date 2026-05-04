@@ -175,7 +175,7 @@ export class GameController {
 
         return this.makeState(
             this.cleanText(passage.description),
-            [{ id: -1, question: "__NEXT__", interactable: true }],
+            [{ id: -1, question: "Next", interactable: true }],
             "none",
             imageName,
             musicName,

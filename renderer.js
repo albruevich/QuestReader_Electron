@@ -424,7 +424,7 @@ function addChoiceButton(choice) {
 
     let caption = choice.question;
 
-    if (caption === "__NEXT__") {
+    if (caption === "Next") {
         caption = t("next");
     }
 
