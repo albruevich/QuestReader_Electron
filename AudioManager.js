@@ -41,8 +41,9 @@ class AudioManager {
         return this.currentMusicName;
     }
 
-    playMusic(musicName, stoppable = true) {
-        if (!musicName) {
+    playMusicUrl(audioUrl, musicName, stoppable = true) {
+
+        if (!audioUrl) {
             if (stoppable) {
                 this.stopMusic();
             }
@@ -54,23 +55,15 @@ class AudioManager {
             return;
         }
 
-        const audioPath = this.findQuestAudioPath("Musics", musicName);
+        this.crossfadeToUrl(audioUrl, musicName);
+    }
 
-        if (!audioPath) {
-            console.warn("Music not found:", musicName);
-
-            if (stoppable) {
-                this.stopMusic();
-            }
-
+    playSfxUrl(audioUrl, sfxName = "remote-sfx") {
+        if (!audioUrl) {
             return;
         }
 
-        this.crossfadeToMusic(audioPath, musicName);
-    }
-
-    playSfx(sfxName) {
-        this.playQuestSfx(sfxName);
+        this.playAudioUrlOnce(audioUrl, this.defaultSfxVolume, sfxName);
     }
 
     playQuestSfx(sfxName) {
@@ -112,11 +105,15 @@ class AudioManager {
     }
 
     playAudioOnce(audioPath, volume) {
-        const audio = new Audio(pathToFileURL(audioPath).href);
+        this.playAudioUrlOnce(pathToFileURL(audioPath).href, volume, audioPath);
+    }
+
+    playAudioUrlOnce(audioUrl, volume, debugName = "audio") {
+        const audio = new Audio(audioUrl);
         audio.volume = volume;
 
         audio.play().catch(error => {
-            console.warn("Failed to play audio:", audioPath, error);
+            console.warn("Failed to play audio:", debugName, error);
         });
     }
 
@@ -150,17 +147,19 @@ class AudioManager {
     }
 
     crossfadeToMusic(audioPath, musicName) {
+        this.crossfadeToUrl(pathToFileURL(audioPath).href, musicName);
+    }
+
+    crossfadeToUrl(audioUrl, musicName) {
         this.clearFade();
 
-        const newUrl = pathToFileURL(audioPath).href;
-
-        if (this.activeMusic.src === newUrl && !this.activeMusic.paused) {
+        if (this.activeMusic.src === audioUrl && !this.activeMusic.paused) {
             this.currentMusicName = musicName;
             return;
         }
 
         this.inactiveMusic.pause();
-        this.inactiveMusic.src = newUrl;
+        this.inactiveMusic.src = audioUrl;
         this.inactiveMusic.loop = true;
         this.inactiveMusic.volume = 0;
         this.inactiveMusic.currentTime = 0;
